@@ -1,8 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2019-2024 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Apache-2.0
- */
 
 #include <string.h>
 
@@ -19,17 +14,13 @@
 #define OTA_RINGBUF_SIZE                    8192
 #define OTA_TASK_SIZE                       8192
 
-static const char * TAG = "ESP_BLE_OTA";
+static const char * TAG = "main";
 static esp_ota_handle_t out_handle;
 SemaphoreHandle_t notify_sem;
 
-
-
-
 static RingbufHandle_t s_ringbuf = NULL;
 
-bool
-ble_ota_ringbuf_init(uint32_t ringbuf_size)
+bool ble_ota_ringbuf_init(uint32_t ringbuf_size)
 {
     s_ringbuf = xRingbufferCreate(ringbuf_size, RINGBUF_TYPE_BYTEBUF);
     if (s_ringbuf == NULL)
@@ -40,8 +31,7 @@ ble_ota_ringbuf_init(uint32_t ringbuf_size)
     return true;
 }
 
-size_t
-write_to_ringbuf(const uint8_t * data, size_t size)
+size_t write_to_ringbuf(const uint8_t * data, size_t size)
 {
     BaseType_t done = xRingbufferSend(s_ringbuf, (void *)data, size, (TickType_t)portMAX_DELAY);
     if (done)
@@ -54,8 +44,7 @@ write_to_ringbuf(const uint8_t * data, size_t size)
     }
 }
 
-void
-ota_task(void * arg)
+void ota_task(void * arg)
 {
     esp_partition_t * partition_ptr = NULL;
     esp_partition_t partition;
@@ -168,53 +157,21 @@ OTA_ERROR:
     vTaskDelete(NULL);
 }
 
-void
-ota_recv_fw_cb(uint8_t * buf, uint32_t length)
+void ota_recv_fw_cb(uint8_t * buf, uint32_t length)
 {
     write_to_ringbuf(buf, length);
 }
 
-static void
-ota_task_init(void)
+void app_ota_task_init(void)
 {
     xTaskCreate(&ota_task, "ota_task", OTA_TASK_SIZE, NULL, 5, NULL);
     return;
 }
 
-static void print_task(void * arg)
-{
-    int cnt = 0;
-    while (1)
-    {
-        ESP_LOGI(TAG, "Free heap size: %d", cnt++);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
-}
-
-static void print_task_init(void)
-{
-    xTaskCreate(&print_task, "print_task", 2048, NULL, 5, NULL);
-}
-
-void app_ble_ota_task_init(void)
+void app_ble_task_init(void)
 {
     esp_err_t ret;
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    // Initialize NVS
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    if (!ble_ota_ringbuf_init(OTA_RINGBUF_SIZE))
-    {
-        ESP_LOGE(TAG, "%s init ringbuf fail", __func__);
-        return;
-    }
-
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
@@ -231,16 +188,54 @@ void app_ble_ota_task_init(void)
         ESP_LOGE(TAG, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
         return;
     }
+    if (!ble_ota_ringbuf_init(OTA_RINGBUF_SIZE))
+    {
+        ESP_LOGE(TAG, "%s init ringbuf fail", __func__);
+        return;
+    }
+
     if (esp_ble_ota_host_init() != ESP_OK)
     {
         ESP_LOGE(TAG, "%s initialize ble host fail: %s\n", __func__, esp_err_to_name(ret));
         return;
     }
-
     esp_ble_ota_recv_fw_data_callback(ota_recv_fw_cb);
-
-    ota_task_init();
 }
+
+void app_nvs_init(void)
+{
+    esp_err_t ret;
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    // Initialize NVS
+    ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+}
+void app_ble_ota_task_init(void)
+{
+    app_nvs_init();
+    app_ble_task_init();
+    app_ota_task_init();
+}
+static void print_task(void * arg)
+{
+    int cnt = 0;
+    while (1)
+    {
+        ESP_LOGI(TAG, "Free heap size: %d", cnt++);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+}
+
+static void print_task_init(void)
+{
+    xTaskCreate(&print_task, "print_task", 2048, NULL, 5, NULL);
+}
+
 
 void
 app_main(void)
