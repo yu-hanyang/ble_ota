@@ -1,3 +1,5 @@
+使用官方库的例子，把例子组件化方便移植
+
 # ESP BLE OTA Demo description
 
 ``ble ota demo`` is based on the ``ble ota component``, it receives firmware via BLE and writes it to flash, sector by sector, until the upgrade is complete.
