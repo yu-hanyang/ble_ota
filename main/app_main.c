@@ -196,8 +196,7 @@ static void print_task_init(void)
     xTaskCreate(&print_task, "print_task", 2048, NULL, 5, NULL);
 }
 
-void
-app_main(void)
+void app_ble_ota_task_init(void)
 {
     esp_err_t ret;
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
@@ -241,5 +240,11 @@ app_main(void)
     esp_ble_ota_recv_fw_data_callback(ota_recv_fw_cb);
 
     ota_task_init();
+}
+
+void
+app_main(void)
+{
+    app_ble_ota_task_init();
     print_task_init();
 }
