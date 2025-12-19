@@ -6,6 +6,7 @@ static const char *TAG = "app_nvs";
 
 void app_nvs_init(void)
 {
+    ESP_LOGI(TAG, "Initializing NVS");
     esp_err_t ret;
     // Initialize NVS
     ret = nvs_flash_init();
