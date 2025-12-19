@@ -20,5 +20,5 @@
 
 bool ble_ota_ringbuf_init(uint32_t ringbuf_size);
 void ota_recv_fw_cb(uint8_t * buf, uint32_t length);
-void app_ble_ota_task_init();
+void app_ota_task_init(void);
 #endif

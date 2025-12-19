@@ -13,6 +13,7 @@
 
 #include "app_ota.h"
 #include "app_nvs.h"
+#include "app_ble.h"
 
 
 
@@ -38,6 +39,7 @@ void
 app_main(void)
 {
     app_nvs_init();
-    app_ble_ota_task_init();
+    app_ble_task_init();
+    app_ota_task_init();//使用该任务前蓝牙和flash得先启动
     print_task_init();
 }

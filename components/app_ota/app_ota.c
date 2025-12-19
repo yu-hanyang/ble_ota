@@ -158,8 +158,3 @@ void app_ota_task_init(void)
 
 
 
-void app_ble_ota_task_init(void)
-{
-    app_ble_task_init();
-    app_ota_task_init();//使用该任务前蓝牙和flash得先启动
-}
