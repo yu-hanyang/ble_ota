@@ -1,4 +1,5 @@
-使用官方库的例子，把例子组件化方便移植，idf v5.2.6 在windows10 64bit 下
+使用官方库的例子，把例子组件化方便移植，idf v5.2.6 在windows10 64bit 下 使用esp32h2-4n 使用freertos
+有led 按键 controller 蓝牙ota 
 
 # ESP BLE OTA Demo description
 
