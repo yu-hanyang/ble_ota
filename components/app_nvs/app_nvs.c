@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include "app_nvs.h"
 
+
+static const char *TAG = "app_nvs";
+
 void app_nvs_init(void)
 {
     esp_err_t ret;
