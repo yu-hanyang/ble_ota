@@ -190,22 +190,9 @@ void app_ble_task_init(void)
     esp_ble_ota_recv_fw_data_callback(ota_recv_fw_cb);
 }
 
-void app_nvs_init(void)
-{
-    esp_err_t ret;
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    // Initialize NVS
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-}
+
 void app_ble_ota_task_init(void)
 {
-    app_nvs_init();
     app_ble_task_init();
-    app_ota_task_init();
+    app_ota_task_init();//使用该任务前蓝牙和flash得先启动
 }

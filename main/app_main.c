@@ -10,10 +10,11 @@
 #include "esp_bt.h"
 #include "ble_ota.h"
 #include "freertos/semphr.h"
-#include "app_ota.h"
 
-#define OTA_RINGBUF_SIZE                    8192
-#define OTA_TASK_SIZE                       8192
+#include "app_ota.h"
+#include "app_nvs.h"
+
+
 
 static const char * TAG = "main";
 
@@ -36,6 +37,7 @@ static void print_task_init(void)
 void
 app_main(void)
 {
+    app_nvs_init();
     app_ble_ota_task_init();
     print_task_init();
 }
