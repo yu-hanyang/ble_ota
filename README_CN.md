@@ -1,3 +1,4 @@
+使用官方库的例子，把例子组件化方便移植，idf v5.2.6 在windows10 64bit 下
 # ESP BLE OTA 示例说明
 
 ``ble ota demo`` 基于 ``ble ota component``，通过 BLE 接收待升级的固件，然后以扇区为单位，依次写入 flash，直到升级完成。

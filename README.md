@@ -1,4 +1,4 @@
-使用官方库的例子，把例子组件化方便移植
+使用官方库的例子，把例子组件化方便移植，idf v5.2.6 在windows10 64bit 下
 
 # ESP BLE OTA Demo description
 
