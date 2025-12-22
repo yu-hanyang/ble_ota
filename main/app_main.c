@@ -27,7 +27,7 @@ static const char * TAG = "main";
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "+++++++++++app_main start+++++++++++");
+    ESP_LOGI(TAG, "++++++++++++++++++++++++++++app_main start+++++++++++++++++++++");
     app_controller_task_init();
 
     app_nvs_init();

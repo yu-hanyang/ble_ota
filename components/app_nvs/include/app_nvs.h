@@ -10,7 +10,7 @@
 #include "freertos/semphr.h"
 #include "app_controller.h"
 
-extern bool update_flag;
+extern bool app_nvs_update_flag;
 
 void app_nvs_init(void);
 

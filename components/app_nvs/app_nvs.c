@@ -8,7 +8,7 @@
 #define EEP_MAX_SIZE            0x4000
 
 static const esp_partition_t *pt_partion = NULL;
-bool update_flag = false;
+bool app_nvs_update_flag = false;
 
 static const char * TAG = "app_nvs";
 
@@ -63,10 +63,10 @@ static void app_nvs_task(void * pvParameter)
     app_nvs_read_usercfg();//初始化的时候读取usercfg
     while (1)
     {
-        if (update_flag == true)
+        if (app_nvs_update_flag == true)
         {
             app_nvs_update_usercfg();
-            update_flag = false;
+            app_nvs_update_flag = false;
         }
         
         
