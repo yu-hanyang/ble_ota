@@ -51,6 +51,7 @@ static void app_led_task(void * pvParameter)
         /* Toggle the LED state */
         s_led_state = !s_led_state;
         s_controller.userCfg.product_serial_number++;
+        update_flag = true;
         ESP_LOGI(TAG, "Serial number: %lu", s_controller.userCfg.product_serial_number);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
