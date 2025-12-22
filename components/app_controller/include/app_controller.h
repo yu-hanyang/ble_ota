@@ -31,6 +31,11 @@ typedef struct
 
 extern controller_t s_controller;
 
+void app_controller_param_clear(void);
+
+void app_userCfg_init(void);
+
+void app_controller_init(void);
 
 void app_controller_task_init(void);
 

@@ -69,9 +69,25 @@ static bool s_controller_build_date_init(void)
     return true;
 }
 
-static void app_controller_task(void * pvParameter)
+
+
+void app_controller_param_clear(void)
+{
+    memset(&s_controller, 0, sizeof(s_controller));
+}
+
+void app_userCfg_init(void)
+{
+    s_controller.userCfg.product_serial_number = 2000;
+}
+
+void app_controller_init(void)
 {
     s_controller_build_date_init();
+}
+static void app_controller_task(void * pvParameter)
+{
+    app_controller_init();
     char build_info[128];
     snprintf(build_info, sizeof(build_info),
         "build_date:%lu, build_time:%lu, software_version:%d.%d.%d",
