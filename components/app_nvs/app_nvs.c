@@ -12,6 +12,7 @@ bool app_nvs_update_flag = false;
 
 static const char * TAG = "app_nvs";
 
+SemaphoreHandle_t nvs_semaphore;
 
 static void app_nvs_erase_partition(void)
 {
@@ -36,8 +37,10 @@ static void app_nvs_read_usercfg(void)
 
 static void app_nvs_update_usercfg(void)
 {
+    xSemaphoreTake(nvs_semaphore, portMAX_DELAY); //加锁
     app_nvs_write_usercfg();
     app_nvs_read_usercfg();
+    xSemaphoreGive(nvs_semaphore);
 }
 
 static void app_nvs_task(void * pvParameter)
@@ -60,6 +63,8 @@ static void app_nvs_task(void * pvParameter)
         return;
     }
 
+    nvs_semaphore = xSemaphoreCreateMutex();
+
     app_nvs_read_usercfg();//初始化的时候读取usercfg
     while (1)
     {
@@ -69,14 +74,8 @@ static void app_nvs_task(void * pvParameter)
             app_nvs_update_flag = false;
         }
         
-        
-        
-
-
-
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         
-
         ESP_LOGI(TAG, "-----------------------------------Serial number: %lu", s_controller.userCfg.product_serial_number);
     }
     
