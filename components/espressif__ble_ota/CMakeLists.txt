@@ -1,6 +1,6 @@
 set(srcs "")
 set(priv_include_dirs "")
-set(requires bt nvs_flash protocomm esp_netif protobuf-c)
+set(requires bt nvs_flash protocomm esp_netif protobuf-c app_controller)
 set(priv_requires json esp_timer)
 
 if(CONFIG_BT_NIMBLE_ENABLED)

@@ -72,6 +72,7 @@ struct gatts_profile_inst {
     uint16_t gatts_if;
     uint16_t conn_id;
     uint16_t mtu_size;
+    uint16_t char_handle;
 };
 
 #ifdef CONFIG_BT_BLE_50_FEATURES_SUPPORTED
@@ -631,6 +632,7 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
                 uint16_t descr_value = param->write.value[1] << 8 | param->write.value[0];
                 if (descr_value == 0x0001)
                 {
+                    s_controller.ble_notify_enable = true;
                     ESP_LOGI(GATTS_TABLE_TAG, "notify enable");
                     uint8_t notify_data[15];
                     for (int i = 0; i < sizeof(notify_data); ++i)
@@ -656,7 +658,9 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
                     esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, dis_handle_table[IDX_CHAR_VAL_A],
                                         sizeof(indicate_data), indicate_data, true);
                 }
-                else if (descr_value == 0x0000){
+                else if (descr_value == 0x0000)
+                {
+                    s_controller.ble_notify_enable = false;
                     ESP_LOGI(GATTS_TABLE_TAG, "notify/indicate disable ");
                 }else{
                     ESP_LOGE(GATTS_TABLE_TAG, "unknown descr value");
@@ -1230,6 +1234,38 @@ esp_err_t esp_ble_ota_notification_data(esp_ble_ota_char_t ota_char, uint8_t *va
     return ESP_OK;
 }
 
+esp_err_t esp_ble_dis_send_indication(uint8_t *value, uint8_t length)
+{
+    // esp_err_t ret;
+    // uint16_t offset = 0;
+    esp_ble_gatts_set_attr_value(dis_handle_table[IDX_CHAR_VAL_A], length, value);
+    // esp_ble_gatts_send_indicate(ota_profile_tab[DIS_PROFILE_APP_IDX].gatts_if, ota_profile_tab[DIS_PROFILE_APP_IDX].conn_id, dis_handle_table[IDX_CHAR_VAL_A],
+        // length, value, false);
+
+    return ESP_OK;
+}
+
+void test_task(void *arg)
+{
+    uint8_t cnt = 0;    
+    while (1)
+    {
+        esp_ble_gatts_set_attr_value(dis_handle_table[IDX_CHAR_VAL_A], 1, &cnt);
+        // 发送通知
+        esp_ble_gatts_send_indicate(
+            ota_profile_tab[1].gatts_if,
+            ota_profile_tab[1].conn_id,
+            dis_handle_table[IDX_CHAR_VAL_A],
+            1,
+            &cnt,
+            false
+        );
+        cnt++;
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGI(GATTS_TABLE_TAG, "my_ble_test");
+    }
+}
+
 esp_err_t esp_ble_ota_recv_fw_data_callback(esp_ble_ota_recv_fw_cb_t callback)
 {
     ota_cb_fun_t.recv_fw_cb = callback;
@@ -1279,6 +1315,8 @@ esp_err_t esp_ble_ota_host_init(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+
+    //xTaskCreatePinnedToCore(test_task, "test_task", 2048, NULL, 5, NULL, 0);
     ESP_LOGE(TAG, "BLE OTA Host Init Success++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     return ESP_OK;
 }

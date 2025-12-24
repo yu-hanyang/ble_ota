@@ -18,15 +18,14 @@ typedef struct{
 
 typedef struct
 {
-
-
     /*控制台参数，需要记录在EEPROM页1中 */
     user_cfg_t  userCfg;
-
 
     uint16_t software_version[3];//软件版本号
     uint32_t build_date;//编译日期 格式为年月日，如2025 年 3 月 10 日发布，显示为20250310
     uint32_t build_time;//编译时间 格式为hhmmss
+
+    bool ble_notify_enable;
 }controller_t;
 
 extern controller_t s_controller;

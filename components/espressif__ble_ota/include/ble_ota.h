@@ -9,6 +9,8 @@
 #ifndef _BLE_OTA_H_
 #define _BLE_OTA_H_
 
+#include "app_controller.h"
+
 #ifdef CONFIG_PRE_ENC_OTA
 #include "esp_encrypted_img.h"
 #endif
@@ -181,6 +183,9 @@ unsigned int esp_ble_ota_get_fw_length(void);
  *
  */
 void esp_ble_ota_finish(void);
+
+esp_err_t esp_ble_dis_send_indication(uint8_t * value, uint8_t length);
+
 #ifdef __cplusplus
 }
 #endif
