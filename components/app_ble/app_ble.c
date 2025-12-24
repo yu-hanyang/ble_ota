@@ -34,5 +34,6 @@ void app_ble_task_init(void)
         ESP_LOGE(TAG, "%s initialize ble host fail: %s\n", __func__, esp_err_to_name(ret));
         return;
     }
+    ESP_LOGE(TAG, "%s initialize ble host success\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++", __func__);
     esp_ble_ota_recv_fw_data_callback(ota_recv_fw_cb);
 }

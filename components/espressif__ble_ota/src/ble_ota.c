@@ -29,6 +29,11 @@
 #define DIS_PROFILE_APP_IDX       1
 #define BUF_LENGTH                4098
 
+#define GATTS_DEMO_CHAR_VAL_LEN_MAX 500
+#define PREPARE_BUF_MAX_SIZE        1024
+#define CHAR_DECLARATION_SIZE       (sizeof(uint8_t))
+
+
 #define BLE_OTA_MAX_CHAR_VAL_LEN  600
 
 #define BLE_OTA_START_CMD         0x0001
@@ -128,8 +133,14 @@ esp_ble_ota_notification_check_t ota_notification = {
     .customer_ntf_enable = false,
 };
 
-static void gatts_ota_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+
+
+
+
+static void gatts_ota_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t * param);
 static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
+    esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t * param);
 
 /**
  * @brief           This function is called to send notification to remote device
@@ -322,6 +333,12 @@ static const uint16_t DIS_SERVICE_UUID    = 0x180A;
 static const uint16_t DIS_MODEL_CHAR_UUID = 0x2A24;
 static const uint16_t DIS_SN_CHAR_UUID    = 0x2A25;
 static const uint16_t DIS_FW_CHAR_UUID    = 0x2A26;
+/* Service */
+static const uint16_t GATTS_CHAR_UUID_TEST_A = 0xFF01;
+
+static const uint8_t char_prop_read_write_notify   = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+static const uint8_t heart_measurement_ccc[2]      = {0x00, 0x00};
+static const uint8_t char_value[4] = { 0x11, 0x22, 0x33, 0x44 };
 
 static uint8_t dis_model_value[] = "Espressif";
 static uint8_t dis_sn_value[]    = "esp-ota";
@@ -386,6 +403,21 @@ static const esp_gatts_attr_db_t dis_gatt_db[DIS_IDX_NB] = {
             sizeof(dis_fw_value), sizeof(dis_fw_value), (uint8_t *)dis_fw_value
         }
     },
+
+    /* Characteristic Declaration */
+    [IDX_CHAR_A]     =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+      CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write_notify}},
+
+    /* Characteristic Value */
+    [IDX_CHAR_VAL_A] =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&GATTS_CHAR_UUID_TEST_A, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+      GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(char_value), (uint8_t *)char_value}},
+
+    /* Client Characteristic Configuration Descriptor */
+    [IDX_CHAR_CFG_A]  =
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+      sizeof(uint16_t), sizeof(heart_measurement_ccc), (uint8_t *)heart_measurement_ccc}},
 };
 
 static uint16_t crc16_ccitt(const unsigned char *buf, int len)
@@ -1124,7 +1156,7 @@ esp_err_t esp_ble_ota_host_init(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-
+    ESP_LOGE(TAG, "BLE OTA Host Init Success++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     return ESP_OK;
 }
 #endif

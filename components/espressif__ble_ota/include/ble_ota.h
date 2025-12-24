@@ -73,6 +73,10 @@ typedef enum {
     DIS_FW_CHAR_IDX,
     DIS_FW_CHAR_VAL_IDX,
 
+    IDX_CHAR_A,
+    IDX_CHAR_VAL_A,
+    IDX_CHAR_CFG_A,
+
     DIS_IDX_NB,
 } esp_ble_dis_service_index_t;
 
@@ -98,6 +102,9 @@ typedef enum {
 
     OTA_IDX_NB,
 } esp_ble_ota_service_index_t;
+
+
+
 
 #else
 
