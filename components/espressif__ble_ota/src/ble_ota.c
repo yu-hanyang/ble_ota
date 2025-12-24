@@ -26,9 +26,15 @@
 
 #ifdef CONFIG_BT_BLUEDROID_ENABLED
 
-#define OTA_PROFILE_NUM           2
+#define OTA_PROFILE_NUM           3
 #define OTA_PROFILE_APP_IDX       0
 #define DIS_PROFILE_APP_IDX       1
+
+#define HEART_PROFILE_APP_ID 2
+#define HEART_RATE_SVC_UUID 0x180D
+#define HEART_RATE_CHAR_UUID 0x2A37
+#define HEART_NUM_HANDLE 4
+
 #define BUF_LENGTH                4098
 
 #define GATTS_DEMO_CHAR_VAL_LEN_MAX 500
@@ -72,7 +78,32 @@ struct gatts_profile_inst {
     uint16_t gatts_if;
     uint16_t conn_id;
     uint16_t mtu_size;
+
+
+    uint16_t service_handle;
+    esp_gatt_srvc_id_t service_id;
     uint16_t char_handle;
+    esp_bt_uuid_t char_uuid;
+    esp_gatt_perm_t perm;
+    esp_gatt_char_prop_t property;
+    uint16_t descr_handle;
+    esp_bt_uuid_t descr_uuid;
+};
+
+static esp_ble_adv_data_t adv_data = {
+    .set_scan_rsp = false,
+    .include_name = true,
+    .include_txpower = false,
+    .min_interval = 0x0006,
+    .max_interval = 0x0010,
+    .appearance = 0x00,
+    .manufacturer_len = 0,
+    .p_manufacturer_data =  NULL,
+    .service_data_len = 0,
+    .p_service_data = NULL,
+    .service_uuid_len = 0,
+    .p_service_uuid = NULL,
+    .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
 };
 
 #ifdef CONFIG_BT_BLE_50_FEATURES_SUPPORTED
@@ -115,6 +146,14 @@ static esp_ble_adv_params_t ota_adv_params = {
     .channel_map        = ADV_CHNL_ALL,
     .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
+static esp_ble_adv_params_t adv_params = {
+    .adv_int_min        = 0x20,  // 20ms
+    .adv_int_max        = 0x40,  // 40ms
+    .adv_type           = ADV_TYPE_IND,
+    .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+    .channel_map        = ADV_CHNL_ALL,
+    .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
 
 static const uint8_t ota_adv_data[31] = {
     0x02, 0x01, 0x06,
@@ -145,9 +184,25 @@ esp_ble_ota_notification_check_t ota_notification = {
 
 
 
+static void heart_gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+static void example_write_event_env(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+
 
 static void gatts_ota_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t * param);
 static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+
+static const char *GATTS_TAG = "GATTS_DEMO";
+static esp_gatt_char_prop_t heart_property = 0;
+static uint8_t heart_rate_val[2] = {0};
+static bool indicate_enabled = false;
+static bool hrs_create_cmpl = false;  // Heart Rate Service
+static uint8_t adv_config_done = 0;
+
+static esp_attr_value_t heart_rate_attr = {
+    .attr_max_len = 2,
+    .attr_len     = sizeof(heart_rate_val),
+    .attr_value   = heart_rate_val,
+};
 
 
 /**
@@ -185,6 +240,12 @@ static struct gatts_profile_inst ota_profile_tab[OTA_PROFILE_NUM] = {
     },
     [DIS_PROFILE_APP_IDX] = {
         .gatts_cb = gatts_dis_profile_event_handler,
+        .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
+        .conn_id  = 0xff,
+        .mtu_size = 23,
+    },
+    [HEART_PROFILE_APP_ID] = {
+        .gatts_cb = heart_gatts_profile_event_handler,
         .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
         .conn_id  = 0xff,
         .mtu_size = 23,
@@ -728,8 +789,175 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
         break;
     case ESP_GATTS_DELETE_EVT:
         break;
+    case ESP_GATTS_SET_ATTR_VAL_EVT:
+        // ESP_LOGI(GATTS_TAG, "Attribute value set, status %d", param->set_attr_val.status);
+        ESP_LOGE("222222", "here?");
+        // if (indicate_enabled)
+        // {
+        //     uint8_t indicate_data[2] = {0};
+        //     memcpy(indicate_data, heart_rate_val, sizeof(heart_rate_val));
+        // esp_ble_gatts_send_indicate(gatts_if, gl_profile_tab[HEART_PROFILE_APP_ID].conn_id, gl_profile_tab[HEART_PROFILE_APP_ID].char_handle, sizeof(indicate_data), indicate_data, true);
+        // }
+        
+            esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, dis_handle_table[IDX_CHAR_VAL_A],
+                4, s_controller.env_data.data, true);
+        break;
     default:
         break;
+    }
+}
+
+static void heart_gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
+{
+    switch (event) {
+    case ESP_GATTS_REG_EVT:
+        ESP_LOGI(GATTS_TAG, "GATT server register, status %d, app_id %d", param->reg.status, param->reg.app_id);
+        ota_profile_tab[HEART_PROFILE_APP_ID].service_id.is_primary = true;
+        ota_profile_tab[HEART_PROFILE_APP_ID].service_id.id.inst_id = 0x00;
+        ota_profile_tab[HEART_PROFILE_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_16;
+        ota_profile_tab[HEART_PROFILE_APP_ID].service_id.id.uuid.uuid.uuid16 = HEART_RATE_SVC_UUID;
+
+        //config adv data
+        esp_err_t ret = esp_ble_gap_config_adv_data(&adv_data);
+        if (ret) {
+            ESP_LOGE(GATTS_TAG, "config adv data failed, error code = %x", ret);
+            break;
+        }
+
+        esp_ble_gatts_create_service(gatts_if, &ota_profile_tab[HEART_PROFILE_APP_ID].service_id, HEART_NUM_HANDLE);
+        break;
+    case ESP_GATTS_CREATE_EVT:
+        //service has been created, now add characteristic declaration
+        ESP_LOGI(GATTS_TAG, "Service create, status %d, service_handle %d", param->create.status, param->create.service_handle);
+        ota_profile_tab[HEART_PROFILE_APP_ID].service_handle = param->create.service_handle;
+        ota_profile_tab[HEART_PROFILE_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
+        ota_profile_tab[HEART_PROFILE_APP_ID].char_uuid.uuid.uuid16 = HEART_RATE_CHAR_UUID;
+        esp_ble_gatts_start_service(ota_profile_tab[HEART_PROFILE_APP_ID].service_handle);
+        heart_property = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_INDICATE;
+        ret = esp_ble_gatts_add_char(ota_profile_tab[HEART_PROFILE_APP_ID].service_handle, &ota_profile_tab[HEART_PROFILE_APP_ID].char_uuid,
+                            ESP_GATT_PERM_READ,
+                            heart_property,
+                            &heart_rate_attr, NULL);
+        if (ret) {
+            ESP_LOGE(GATTS_TAG, "add char failed, error code = %x", ret);
+        }
+        break;
+    case ESP_GATTS_ADD_CHAR_EVT:
+        ESP_LOGI(GATTS_TAG, "Characteristic add, status %d, attr_handle %d, char_uuid %x",
+                 param->add_char.status, param->add_char.attr_handle, param->add_char.char_uuid.uuid.uuid16);
+                 ota_profile_tab[HEART_PROFILE_APP_ID].char_handle = param->add_char.attr_handle;
+                 ota_profile_tab[HEART_PROFILE_APP_ID].descr_uuid.len = ESP_UUID_LEN_16;
+                 ota_profile_tab[HEART_PROFILE_APP_ID].descr_uuid.uuid.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
+        ESP_LOGI(GATTS_TAG, "heart rate char handle %d", param->add_char.attr_handle);
+        ret = esp_ble_gatts_add_char_descr(ota_profile_tab[HEART_PROFILE_APP_ID].service_handle, &ota_profile_tab[HEART_PROFILE_APP_ID].descr_uuid,
+                            ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, NULL, NULL);
+        break;
+    case ESP_GATTS_ADD_CHAR_DESCR_EVT:
+        ESP_LOGI(GATTS_TAG, "Descriptor add, status %d, attr_handle %u",
+                 param->add_char_descr.status, param->add_char_descr.attr_handle);
+                 ota_profile_tab[HEART_PROFILE_APP_ID].descr_handle = param->add_char_descr.attr_handle;
+        hrs_create_cmpl = true;
+        break;
+    case ESP_GATTS_READ_EVT:
+        ESP_LOGI(GATTS_TAG, "Characteristic read");
+        esp_gatt_rsp_t rsp;
+        memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
+        rsp.attr_value.handle = param->read.handle;
+        rsp.attr_value.len = 2;
+        memcpy(rsp.attr_value.value, heart_rate_val, sizeof(heart_rate_val));
+        esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+        break;
+    case ESP_GATTS_WRITE_EVT:
+        ESP_LOGI(GATTS_TAG, "Characteristic write, value len %u, value ", param->write.len);
+        ESP_LOG_BUFFER_HEX(GATTS_TAG, param->write.value, param->write.len);
+
+        if (ota_profile_tab[HEART_PROFILE_APP_ID].descr_handle == param->write.handle && param->write.len == 2) {
+            uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
+            if (descr_value == 0x0001) {
+                if (heart_property & ESP_GATT_CHAR_PROP_BIT_NOTIFY) {
+                    ESP_LOGI(GATTS_TAG, "Notification enable");
+                    uint8_t notify_data[15];
+                    for (int i = 0; i < sizeof(notify_data); i++) {
+                        notify_data[i] = i%0xff;
+                    }
+                    //the size of notify_data[] need less than MTU size
+                    esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, ota_profile_tab[HEART_PROFILE_APP_ID].char_handle,
+                                            sizeof(notify_data), notify_data, false);
+                }
+            } else if (descr_value == 0x0002) {
+                if (heart_property & ESP_GATT_CHAR_PROP_BIT_INDICATE) {
+                    ESP_LOGI(GATTS_TAG, "Indication enable");
+                    indicate_enabled = true;
+                    uint8_t indicate_data[15];
+                    for (int i = 0; i < sizeof(indicate_data); i++) {
+                        indicate_data[i] = i%0xff;
+                    }
+                    //the size of indicate_data[] need less than MTU size
+                    esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, ota_profile_tab[HEART_PROFILE_APP_ID].char_handle,
+                                            sizeof(indicate_data), indicate_data, true);
+                }
+            } else if (descr_value == 0x0000) {
+                indicate_enabled = false;
+                ESP_LOGI(GATTS_TAG, "Notification/Indication disable");
+            } else {
+                ESP_LOGE(GATTS_TAG, "Invalid descriptor value");
+                ESP_LOG_BUFFER_HEX(GATTS_TAG, param->write.value, param->write.len);
+            }
+        }
+        example_write_event_env(gatts_if, param);
+        break;
+    case ESP_GATTS_DELETE_EVT:
+        break;
+    case ESP_GATTS_START_EVT:
+        ESP_LOGI(GATTS_TAG, "Service start, status %d, service_handle %d", param->start.status, param->start.service_handle);
+        break;
+    case ESP_GATTS_STOP_EVT:
+        break;
+    case ESP_GATTS_CONNECT_EVT:
+        ESP_LOGI(GATTS_TAG, "Connected, conn_id %u, remote "ESP_BD_ADDR_STR"",
+                param->connect.conn_id, ESP_BD_ADDR_HEX(param->connect.remote_bda));
+                ota_profile_tab[HEART_PROFILE_APP_ID].conn_id = param->connect.conn_id;
+        break;
+    case ESP_GATTS_DISCONNECT_EVT:
+        ESP_LOGI(GATTS_TAG, "Disconnected, remote "ESP_BD_ADDR_STR", reason 0x%02x",
+                 ESP_BD_ADDR_HEX(param->disconnect.remote_bda), param->disconnect.reason);
+        indicate_enabled = false;
+        esp_ble_gap_start_advertising(&adv_params);
+        break;
+    case ESP_GATTS_CONF_EVT:
+        ESP_LOGI(GATTS_TAG, "Confirm receive, status %d, attr_handle %d", param->conf.status, param->conf.handle);
+        if (param->conf.status != ESP_GATT_OK) {
+            ESP_LOG_BUFFER_HEX(GATTS_TAG, param->conf.value, param->conf.len);
+        }
+        break;
+    case ESP_GATTS_SET_ATTR_VAL_EVT:
+        ESP_LOGI(GATTS_TAG, "Attribute value set, status %d", param->set_attr_val.status);
+        ESP_LOGE("111111", "here?");
+        if (indicate_enabled)
+        {
+            uint8_t indicate_data[2] = {0};
+            memcpy(indicate_data, heart_rate_val, sizeof(heart_rate_val));
+            esp_ble_gatts_send_indicate(gatts_if, ota_profile_tab[HEART_PROFILE_APP_ID].conn_id, ota_profile_tab[HEART_PROFILE_APP_ID].char_handle, sizeof(indicate_data), indicate_data, true);
+        }
+        break;
+    default:
+        break;
+    }
+}
+static void heart_rate_task(void* param)
+{
+    ESP_LOGI(GATTS_TAG, "Heart Rate Task Start");
+    heart_rate_val[1] = 99;
+    while (1) {
+        if (hrs_create_cmpl) {
+            // update_heart_rate();
+            ESP_LOGI(GATTS_TAG, "Heart Rate updated to %d", heart_rate_val[1]);
+
+            heart_rate_val[1]++;
+            esp_ble_gatts_set_attr_value(ota_profile_tab[HEART_PROFILE_APP_ID].char_handle, 2, heart_rate_val);
+        }
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -1299,6 +1527,7 @@ esp_err_t esp_ble_ota_host_init(void)
 
     esp_ble_gatts_app_register(OTA_PROFILE_APP_IDX);
     esp_ble_gatts_app_register(DIS_PROFILE_APP_IDX);
+    esp_ble_gatts_app_register(HEART_PROFILE_APP_ID);
 
     /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_BOND;     //bonding with peer device after authentication
@@ -1317,7 +1546,19 @@ esp_err_t esp_ble_ota_host_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
 
     //xTaskCreatePinnedToCore(test_task, "test_task", 2048, NULL, 5, NULL, 0);
+    xTaskCreate(heart_rate_task, "Heart Rate", 2 * 1024, NULL, 5, NULL);
+
     ESP_LOGE(TAG, "BLE OTA Host Init Success++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     return ESP_OK;
 }
+
+
+void example_write_event_env(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
+{
+    esp_gatt_status_t status = ESP_GATT_OK;
+    if (param->write.need_rsp) {
+        esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, NULL);
+    }
+}
+
 #endif

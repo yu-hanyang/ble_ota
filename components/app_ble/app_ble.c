@@ -18,6 +18,7 @@ static void app_ble_notify_task(void *arg)
             notify_data[1] = 0xBB;
             notify_data[2] = 0xCC;
             notify_data[3] = cnt;
+            memcpy(s_controller.env_data.data, notify_data, sizeof(notify_data));
             esp_ble_dis_send_indication(notify_data, sizeof(notify_data));
             ESP_LOGI(TAG, "BLE notify data sentTTTTTTTTTTTTT");
             cnt++;

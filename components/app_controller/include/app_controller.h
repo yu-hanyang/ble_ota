@@ -18,6 +18,11 @@ typedef struct{
 
 typedef struct
 {
+    uint8_t data[4];
+}env_data_t;
+
+typedef struct
+{
     /*控制台参数，需要记录在EEPROM页1中 */
     user_cfg_t  userCfg;
 
@@ -26,6 +31,7 @@ typedef struct
     uint32_t build_time;//编译时间 格式为hhmmss
 
     bool ble_notify_enable;
+    env_data_t env_data;
 }controller_t;
 
 extern controller_t s_controller;
