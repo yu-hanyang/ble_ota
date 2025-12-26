@@ -344,9 +344,10 @@ static const uint16_t DIS_FW_CHAR_UUID    = 0x2A26;
 /* Service */
 static const uint16_t GATTS_CHAR_UUID_TEST_A = 0xFF01;
 
-static const uint8_t char_prop_read_write_notify   = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+static const uint8_t char_prop_read_write_notify   = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_INDICATE;
 static const uint8_t heart_measurement_ccc[2]      = {0x00, 0x00};
-static const uint8_t char_value[4] = { 0x11, 0x22, 0x33, 0x44 };
+// static const uint8_t char_value[4] = { 0x11, 0x22, 0x33, 0x44 };
+static uint8_t heart_rate_val[2] = { 0 };
 
 static uint8_t dis_model_value[] = "Espressif";
 static uint8_t dis_sn_value[]    = "esp-ota";
@@ -414,13 +415,13 @@ static const esp_gatts_attr_db_t dis_gatt_db[DIS_IDX_NB] = {
 
     /* Characteristic Declaration */
     [IDX_CHAR_A]     =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ |ESP_GATT_PERM_WRITE | ESP_GATT_CHAR_PROP_BIT_INDICATE,
       CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write_notify}},
 
     /* Characteristic Value */
     [IDX_CHAR_VAL_A] =
-    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&GATTS_CHAR_UUID_TEST_A, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-      GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(char_value), (uint8_t *)char_value}},
+    {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&GATTS_CHAR_UUID_TEST_A, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE | ESP_GATT_CHAR_PROP_BIT_INDICATE,
+      GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(heart_rate_val), (uint8_t *)heart_rate_val}},
 
     /* Client Characteristic Configuration Descriptor */
     [IDX_CHAR_CFG_A]  =
@@ -605,6 +606,9 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
     prepare_write_env->prepare_len = 0;
 }
 
+
+static bool indicate_enabled = false;
+
 static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t * param)
 {
     esp_err_t ret;
@@ -645,6 +649,7 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
                 }else if (descr_value == 0x0002){
                     ESP_LOGI(GATTS_TABLE_TAG, "indicate enable");
                     uint8_t indicate_data[15];
+                    indicate_enabled = true;
                     for (int i = 0; i < sizeof(indicate_data); ++i)
                     {
                         indicate_data[i] = i % 0xff;
@@ -656,10 +661,12 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
 
                     //the size of indicate_data[] need less than MTU size
                     esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, dis_handle_table[IDX_CHAR_VAL_A],
-                                        sizeof(indicate_data), indicate_data, true);
+                        sizeof(indicate_data), indicate_data, true);
+                    ESP_LOGE("ID----------ID", "id = %x", param->write.conn_id);
                 }
                 else if (descr_value == 0x0000)
                 {
+                    indicate_enabled = false;
                     s_controller.ble_notify_enable = false;
                     ESP_LOGI(GATTS_TABLE_TAG, "notify/indicate disable ");
                 }else{
@@ -698,8 +705,14 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
         }
         break;
     case ESP_GATTS_CONNECT_EVT:
+        ESP_LOGI("yhy ---- test", "Connected, conn_id %u, remote "ESP_BD_ADDR_STR"",
+                param->connect.conn_id, ESP_BD_ADDR_HEX(param->connect.remote_bda));
+        ota_profile_tab[DIS_PROFILE_APP_IDX].conn_id = param->connect.conn_id;
         break;
     case ESP_GATTS_DISCONNECT_EVT:
+        ESP_LOGI("yhy ---- test", "Disconnected, remote "ESP_BD_ADDR_STR", reason 0x%02x",
+                 ESP_BD_ADDR_HEX(param->disconnect.remote_bda), param->disconnect.reason);
+        indicate_enabled = false;
         break;
     case ESP_GATTS_CREAT_ATTR_TAB_EVT:
         if (param->add_attr_tab.status != ESP_GATT_OK) {
@@ -728,6 +741,19 @@ static void gatts_dis_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt
         break;
     case ESP_GATTS_DELETE_EVT:
         break;
+    case ESP_GATTS_SET_ATTR_VAL_EVT:
+    ESP_LOGE("yyyytttttttyyyyyy", "Attribute value set, status %d", param->set_attr_val.status);
+    
+    if (indicate_enabled)
+    {
+        ESP_LOGE("222222", "here?");
+        uint8_t indicate_data[2] = { 0 };
+        memcpy(indicate_data, heart_rate_val, sizeof(heart_rate_val));
+        //下面这个的第2个参数，很危险，是通过打印找出来的
+        esp_ble_gatts_send_indicate(gatts_if, ota_profile_tab[DIS_PROFILE_APP_IDX].conn_id, dis_handle_table[IDX_CHAR_VAL_A],
+            sizeof(indicate_data), indicate_data, true);
+    }
+    break;
     default:
         break;
     }
@@ -1247,19 +1273,21 @@ esp_err_t esp_ble_dis_send_indication(uint8_t *value, uint8_t length)
 
 void test_task(void *arg)
 {
-    uint8_t cnt = 0;    
+    uint8_t cnt = 0;
+    
     while (1)
     {
-        esp_ble_gatts_set_attr_value(dis_handle_table[IDX_CHAR_VAL_A], 1, &cnt);
+        heart_rate_val[1] = cnt;
+        esp_ble_gatts_set_attr_value(dis_handle_table[IDX_CHAR_VAL_A], 2, heart_rate_val);
         // 发送通知
-        esp_ble_gatts_send_indicate(
-            ota_profile_tab[1].gatts_if,
-            ota_profile_tab[1].conn_id,
-            dis_handle_table[IDX_CHAR_VAL_A],
-            1,
-            &cnt,
-            false
-        );
+        // esp_ble_gatts_send_indicate(
+        //     ota_profile_tab[1].gatts_if,
+        //     ota_profile_tab[1].conn_id,
+        //     dis_handle_table[IDX_CHAR_VAL_A],
+        //     1,
+        //     &cnt,
+        //     false
+        // );
         cnt++;
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         ESP_LOGI(GATTS_TABLE_TAG, "my_ble_test");
@@ -1316,7 +1344,7 @@ esp_err_t esp_ble_ota_host_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
 
-    //xTaskCreatePinnedToCore(test_task, "test_task", 2048, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(test_task, "test_task", 2048, NULL, 5, NULL, 0);
     ESP_LOGE(TAG, "BLE OTA Host Init Success++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     return ESP_OK;
 }
